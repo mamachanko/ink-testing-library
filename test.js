@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import test from 'ava';
 import {Text, StdinContext} from 'ink';
 import {render} from '.';
@@ -29,19 +29,17 @@ test('unmount', t => {
 	let didMount = false;
 	let didUnmount = false;
 
-	class Test extends React.Component {
-		render() {
-			return <Text>Hello World</Text>;
-		}
+	const Test = () => {
+		didMount = true;
 
-		componentDidMount() {
-			didMount = true;
-		}
+		useEffect(() => {
+			return () => {
+				didUnmount = true;
+			};
+		}, []);
 
-		componentWillUnmount() {
-			didUnmount = true;
-		}
-	}
+		return <Text>Hello World</Text>;
+	};
 
 	const {lastFrame, unmount} = render(<Test/>);
 
@@ -55,36 +53,24 @@ test('unmount', t => {
 });
 
 test('write to stdin', t => {
-	class Test extends React.Component {
-		constructor() {
-			super();
+	const Test = () => {
+		const [input, setInput] = useState('');
+		const {stdin, setRawMode} = useContext(StdinContext);
 
-			this.state = {
-				input: ''
+		useEffect(() => {
+			setRawMode(true);
+			stdin.on('data', setInput);
+
+			return () => {
+				stdin.removeListener('data', setInput);
+				setRawMode(false);
 			};
-		}
+		}, [stdin, setInput, setRawMode]);
 
-		render() {
-			return <Text>{this.state.input}</Text>;
-		}
+		return <Text>{input}</Text>;
+	};
 
-		componentDidMount() {
-			this.props.setRawMode(true);
-			this.props.stdin.on('data', data => {
-				this.setState({
-					input: data
-				});
-			});
-		}
-	}
-
-	const {stdin, lastFrame} = render((
-		<StdinContext.Consumer>
-			{({stdin, setRawMode}) => (
-				<Test stdin={stdin} setRawMode={setRawMode}/>
-			)}
-		</StdinContext.Consumer>
-	));
+	const {stdin, lastFrame} = render(<Test/>);
 
 	t.is(lastFrame(), '');
 
